@@ -78,6 +78,4 @@ Measured on the test label in `testdata` (0.3 mm module, Code 128 and Codabar):
 
 ## License
 
-MIT.
-
-The `pdfium` package embeds a WebAssembly build of [PDFium](https://pdfium.googlesource.com/pdfium/) through go-pdfium. PDFium has its own license (BSD-style and Apache-2.0); include its notices when you distribute a binary that imports `pdfium`. This project is not affiliated with Google or the PDFium authors.
+MIT
