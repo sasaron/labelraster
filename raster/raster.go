@@ -1,4 +1,4 @@
-// Package raster renders PDF pages into 1-bit bitmaps on a printer's dot grid.
+// Package raster turns rendered pages into 1-bit bitmaps on a printer's dot grid.
 package raster
 
 import (
@@ -8,38 +8,19 @@ import (
 )
 
 var (
-	_ Strategy = Threshold{}
-	_ Strategy = Supersample{}
-	_ Strategy = Snap{}
-	_ Source   = Page{}
+	_ labelraster.Strategy = Threshold{}
+	_ labelraster.Strategy = Supersample{}
+	_ labelraster.Strategy = Snap{}
 )
-
-// RenderOptions disables anti-aliasing per object type.
-type RenderOptions struct {
-	NoSmoothPath  bool
-	NoSmoothText  bool
-	NoSmoothImage bool
-}
-
-// Source renders a page scaled to width x height pixels.
-type Source interface {
-	Render(width, height int, opt RenderOptions) (*image.Gray, error)
-}
-
-// Strategy turns a page into a bitmap of width x height dots.
-// Density is for strategies whose options are physical sizes.
-type Strategy interface {
-	Rasterize(src Source, d labelraster.Density, width, height int) (labelraster.Bitmap, error)
-}
 
 // Threshold renders at the dot grid and marks pixels darker than Level as black.
 type Threshold struct {
 	Level   uint8 // defaults to 128
-	Options RenderOptions
+	Options labelraster.RenderOptions
 }
 
-// Rasterize implements Strategy.
-func (t Threshold) Rasterize(src Source, _ labelraster.Density, width, height int) (labelraster.Bitmap, error) {
+// Rasterize implements labelraster.Strategy.
+func (t Threshold) Rasterize(src labelraster.Source, _ labelraster.Density, width, height int) (labelraster.Bitmap, error) {
 	img, err := src.Render(width, height, t.Options)
 	if err != nil {
 		return labelraster.Bitmap{}, err
@@ -62,11 +43,11 @@ func (t Threshold) Rasterize(src Source, _ labelraster.Density, width, height in
 type Supersample struct {
 	Factor  int   // defaults to 4
 	Level   uint8 // defaults to 128
-	Options RenderOptions
+	Options labelraster.RenderOptions
 }
 
-// Rasterize implements Strategy.
-func (s Supersample) Rasterize(src Source, _ labelraster.Density, width, height int) (labelraster.Bitmap, error) {
+// Rasterize implements labelraster.Strategy.
+func (s Supersample) Rasterize(src labelraster.Source, _ labelraster.Density, width, height int) (labelraster.Bitmap, error) {
 	f := s.Factor
 	if f < 1 {
 		f = 4

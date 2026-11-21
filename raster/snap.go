@@ -29,8 +29,8 @@ const (
 	maxClassRatio = 4.5
 )
 
-// Rasterize implements Strategy.
-func (s Snap) Rasterize(src Source, d labelraster.Density, width, height int) (labelraster.Bitmap, error) {
+// Rasterize implements labelraster.Strategy.
+func (s Snap) Rasterize(src labelraster.Source, d labelraster.Density, width, height int) (labelraster.Bitmap, error) {
 	b, _, err := newSnapper(s, d).rasterize(src, width, height)
 	return b, err
 }
@@ -67,8 +67,8 @@ type symbol struct {
 	dots     []int           // redrawn element widths; nil when left unchanged
 }
 
-func (s snapper) rasterize(src Source, width, height int) (labelraster.Bitmap, []symbol, error) {
-	img, err := src.Render(width*s.factor, height*s.factor, RenderOptions{})
+func (s snapper) rasterize(src labelraster.Source, width, height int) (labelraster.Bitmap, []symbol, error) {
+	img, err := src.Render(width*s.factor, height*s.factor, labelraster.RenderOptions{})
 	if err != nil {
 		return labelraster.Bitmap{}, nil, err
 	}

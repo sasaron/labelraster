@@ -8,24 +8,26 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/makiuchi-d/gozxing"
 	"github.com/makiuchi-d/gozxing/oned"
 
 	"github.com/sasaron/labelraster"
+	"github.com/sasaron/labelraster/pdfium"
 	"github.com/sasaron/labelraster/raster"
 	"github.com/sasaron/labelraster/sbpl"
 	"github.com/sasaron/labelraster/zpl"
 )
 
 // shared is the Renderer for the PDF tests, since starting PDFium takes about 2 seconds.
-var shared *raster.Renderer
+var shared *pdfium.Renderer
 
 func TestMain(m *testing.M) {
 	flag.Parse()
 	if !testing.Short() {
-		r, err := raster.NewRenderer()
+		r, err := pdfium.NewRenderer()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
@@ -41,13 +43,13 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// rasterizeLabel renders page 0 of raster/testdata/file.
-func rasterizeLabel(t *testing.T, file string, d labelraster.Density, s raster.Strategy) labelraster.Bitmap {
+// rasterizeLabel renders page 0 of testdata/file.
+func rasterizeLabel(t *testing.T, file string, d labelraster.Density, s labelraster.Strategy) labelraster.Bitmap {
 	t.Helper()
 	if shared == nil {
 		t.Skip("skipping PDFium test in short mode")
 	}
-	data, err := os.ReadFile(filepath.Join("raster", "testdata", file))
+	data, err := os.ReadFile(filepath.Join("testdata", file))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,7 +102,7 @@ func scanLine(b labelraster.Bitmap, d labelraster.Density, atMM float64, vertica
 func TestSnap_LabelPDF_BarcodesStayReadable(t *testing.T) {
 	barcodes := []struct {
 		name     string
-		atMM     float64 // middle of the barcode, see raster/testdata/label.json
+		atMM     float64 // middle of the barcode, see testdata/label.json
 		vertical bool
 		reader   func() gozxing.Reader
 		want     string // Codabar readers drop the start and stop characters
@@ -154,5 +156,105 @@ func TestZPL_LabelPDF_SplitsIntoTwoBands(t *testing.T) {
 
 	if n := bytes.Count(got, []byte("^GFA")); n != 2 {
 		t.Errorf("zpl.Encode(%dx%d) has %d ^GFA fields, want 2", b.Width, b.Height, n)
+	}
+}
+
+// lineRuns returns the run widths across the row, or column, at atMM millimeters,
+// starting at the first black dot.
+func lineRuns(b labelraster.Bitmap, d labelraster.Density, atMM float64, vertical bool) []int {
+	at := int(math.Round(atMM * float64(d)))
+	n := b.Width
+	if vertical {
+		n = b.Height
+	}
+	var out []int
+	for i := range n {
+		black := b.Black(i, at)
+		if vertical {
+			black = b.Black(at, i)
+		}
+		last := len(out) - 1
+		switch {
+		case last < 0 && !black:
+		case last >= 0 && black == (last%2 == 0):
+			out[last]++
+		default:
+			out = append(out, 1)
+		}
+	}
+	if len(out)%2 == 0 && len(out) > 0 {
+		out = out[:len(out)-1] // trailing white
+	}
+	return out
+}
+
+func TestLineRuns_BarsAndSpaces_ReturnsWidthsFromFirstBar(t *testing.T) {
+	b := labelraster.NewBitmap(10, 1)
+	for _, x := range []int{2, 3, 5, 8} {
+		b.Set(x, 0, true)
+	}
+
+	got := lineRuns(b, labelraster.DPI203, 0, false)
+
+	if want := []int{2, 1, 1, 2, 1}; !slices.Equal(got, want) {
+		t.Errorf("lineRuns(..XX.X..X.) = %v, want %v", got, want)
+	}
+}
+
+// timesModules returns modules with each element multiplied by dots.
+func timesModules(modules []int, dots int) []int {
+	out := make([]int, len(modules))
+	for i, m := range modules {
+		out[i] = m * dots
+	}
+	return out
+}
+
+func TestTimesModules_ThreeDots_MultipliesEachElement(t *testing.T) {
+	got := timesModules([]int{1, 2, 4}, 3)
+
+	if want := []int{3, 6, 12}; !slices.Equal(got, want) {
+		t.Errorf("timesModules([1 2 4], 3) = %v, want %v", got, want)
+	}
+}
+
+func TestSnap_LabelPDF_RedrawsBarcodesWithWholeDotModules(t *testing.T) {
+	fs := loadFixtures(t)
+	densities := []struct {
+		d          labelraster.Density
+		moduleDots int // 0.3 mm rounded to whole dots
+	}{
+		{labelraster.DPI203, 2},
+		{labelraster.DPI305, 4},
+		{labelraster.DPI609, 7},
+	}
+	for _, file := range []string{"label.pdf", "label-image.pdf"} {
+		for _, tt := range densities {
+			t.Run(fmt.Sprintf("%s/%v", file, float64(tt.d)), func(t *testing.T) {
+				b := rasterizeLabel(t, file, tt.d, raster.Snap{})
+
+				for _, f := range fs {
+					at := f.Y + f.Height/2
+					if f.Vertical {
+						at = f.X + f.Height/2
+					}
+					got, want := lineRuns(b, tt.d, at, f.Vertical), timesModules(f.Modules, tt.moduleDots)
+					if !slices.Equal(got, want) {
+						t.Errorf("Snap %s = %v, want %v", f.Name, got, want)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestSnap_LabelPDF_LeavesTextUnchanged(t *testing.T) {
+	want := rasterizeLabel(t, "label.pdf", labelraster.DPI203, raster.Supersample{Factor: 8})
+
+	got := rasterizeLabel(t, "label.pdf", labelraster.DPI203, raster.Snap{Factor: 8})
+
+	// The text line sits between 37 and 41 mm from the top, at 8 dots per mm.
+	if !bytes.Equal(got.Bits[296*got.Stride:328*got.Stride], want.Bits[296*want.Stride:328*want.Stride]) {
+		t.Error("Snap changed rows 296 to 328 (text) of label.pdf; want them equal to Supersample{Factor: 8}")
 	}
 }

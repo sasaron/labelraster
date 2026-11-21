@@ -1,4 +1,4 @@
-package raster
+package labelraster_test
 
 import (
 	"encoding/json"
@@ -167,11 +167,11 @@ func TestGenerateFixtures(t *testing.T) {
 }
 
 // TestFixturesUpToDate checks that testdata matches fixtures(); regenerate with
-// go test ./raster -run TestGenerateFixtures -update
+// go test . -run TestGenerateFixtures -update
 func TestFixtures_Testdata_MatchesGenerator(t *testing.T) {
 	got, want := loadFixtures(t), fixtures(t)
 	if !reflect.DeepEqual(got, want) {
-		t.Error("testdata/label.json is out of date; run go test ./raster -run TestGenerateFixtures -update")
+		t.Error("testdata/label.json is out of date; run go test . -run TestGenerateFixtures -update")
 	}
 }
 

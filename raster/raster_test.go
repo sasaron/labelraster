@@ -24,7 +24,7 @@ type barcodeSource struct {
 	leftBar       float64   // a 30-dot black block this many dots left of x0, 0 for none
 }
 
-func (s barcodeSource) Render(w, h int, opt RenderOptions) (*image.Gray, error) {
+func (s barcodeSource) Render(w, h int, opt labelraster.RenderOptions) (*image.Gray, error) {
 	if s.vertical {
 		s.vertical = false
 		hor, _ := s.Render(h, w, opt) // barcodeSource never fails
@@ -84,7 +84,7 @@ func newBarcode(module float64) barcodeSource {
 	return barcodeSource{width: 400, height: 120, modules: pattern, module: module, x0: 60.3, y0: 20, y1: 100}
 }
 
-func rasterize(t *testing.T, s Strategy, src barcodeSource) labelraster.Bitmap {
+func rasterize(t *testing.T, s labelraster.Strategy, src barcodeSource) labelraster.Bitmap {
 	t.Helper()
 	w, h := src.width, src.height
 	if src.vertical {
@@ -147,7 +147,7 @@ var patternAt2 = []int{4, 2, 2, 4, 2, 8, 2, 2, 6, 4, 4, 4, 2, 4, 6, 2, 4, 4, 4, 
 func TestThreshold_OffGridModule_GivesUnevenBars(t *testing.T) {
 	src := newBarcode(2.4)
 
-	b := rasterize(t, Threshold{Options: RenderOptions{NoSmoothPath: true}}, src)
+	b := rasterize(t, Threshold{Options: labelraster.RenderOptions{NoSmoothPath: true}}, src)
 
 	if got := rowRuns(b, 60); slices.Equal(got, patternAt2) {
 		t.Errorf("Threshold row 60 = %v, want uneven widths for a 2.4-dot module", got)
@@ -225,7 +225,7 @@ func TestSnap_DoubtfulBarcode_LeavesSupersampleOutput(t *testing.T) {
 func TestStrategy_ZeroValue_UsesDocumentedDefaults(t *testing.T) {
 	tests := []struct {
 		name           string
-		zero, explicit Strategy
+		zero, explicit labelraster.Strategy
 	}{
 		{"Threshold", Threshold{}, Threshold{Level: 128}},
 		{"Supersample", Supersample{}, Supersample{Factor: 4, Level: 128}},
@@ -249,10 +249,12 @@ type errSource struct{}
 
 var errRender = errors.New("render failed")
 
-func (errSource) Render(int, int, RenderOptions) (*image.Gray, error) { return nil, errRender }
+func (errSource) Render(int, int, labelraster.RenderOptions) (*image.Gray, error) {
+	return nil, errRender
+}
 
 func TestStrategy_SourceFails_ReturnsError(t *testing.T) {
-	for _, s := range []Strategy{Threshold{}, Supersample{}, Snap{}} {
+	for _, s := range []labelraster.Strategy{Threshold{}, Supersample{}, Snap{}} {
 		_, err := s.Rasterize(errSource{}, labelraster.DPI203, 400, 120)
 
 		if !errors.Is(err, errRender) {

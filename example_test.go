@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/sasaron/labelraster"
+	"github.com/sasaron/labelraster/pdfium"
 	"github.com/sasaron/labelraster/raster"
 	"github.com/sasaron/labelraster/rawprint"
 	"github.com/sasaron/labelraster/zpl"
@@ -18,7 +19,7 @@ func Example() {
 		log.Fatal(err)
 	}
 
-	r, err := raster.NewRenderer()
+	r, err := pdfium.NewRenderer()
 	if err != nil {
 		log.Fatal(err)
 	}

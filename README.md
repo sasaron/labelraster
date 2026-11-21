@@ -4,7 +4,7 @@ Go library for printing PDF labels on thermal printers without breaking barcodes
 
 Carriers return shipping labels as PDFs. Most thermal printers cannot print PDFs, so the PDF is rasterized and sent as an image. At 203 dpi a barcode module rarely lands on the dot grid, and ordinary rasterization turns bars of the same width into 2 and 3 dots. labelraster finds 1D barcodes on the page and redraws them so every bar and space is a whole number of dots.
 
-- Pure Go, no cgo. PDFs are rendered with [go-pdfium](https://github.com/klippa-app/go-pdfium) in WebAssembly mode.
+- Pure Go, no cgo. The `pdfium` package renders PDFs with [go-pdfium](https://github.com/klippa-app/go-pdfium) in WebAssembly mode. The other packages do not depend on it, so you can bring your own renderer.
 - Output as ZPL (`^GFA`) or SBPL (`ESC+G`, experimental).
 - Horizontal and vertical barcodes, embedded as vector paths or images.
 
@@ -19,7 +19,7 @@ Requires Go 1.26 or later.
 ## Example
 
 ```go
-r, err := raster.NewRenderer()
+r, err := pdfium.NewRenderer()
 if err != nil {
 	log.Fatal(err)
 }
@@ -43,8 +43,9 @@ err = rawprint.Send(ctx, "192.0.2.10", zpl.Encode(b, zpl.Options{}))
 
 | Package | Description |
 | --- | --- |
-| `labelraster` | `Bitmap` and `Density` |
-| `raster` | Renders PDF pages. Strategies: `Threshold`, `Supersample`, `Snap` |
+| `labelraster` | `Bitmap`, `Density`, and the `Source` and `Strategy` interfaces |
+| `pdfium` | Renders PDF pages with PDFium (WebAssembly). Adds about 12 MB to a binary |
+| `raster` | Strategies that turn a `Source` into a `Bitmap`: `Threshold`, `Supersample`, `Snap` |
 | `zpl` | Encodes a bitmap as ZPL |
 | `sbpl` | Encodes a bitmap as SBPL |
 | `rawprint` | Sends data to TCP port 9100 |
@@ -59,7 +60,7 @@ err = rawprint.Send(ctx, "192.0.2.10", zpl.Encode(b, zpl.Options{}))
 
 `Snap` keeps the barcode centered. When rounding makes it wider, it keeps at least `QuietModules` modules of quiet zone, or falls back to a narrower module. Everything outside barcodes is rendered as `Supersample` renders it.
 
-Measured on the test label in `raster/testdata` (0.3 mm module, Code 128 and Codabar):
+Measured on the test label in `testdata` (0.3 mm module, Code 128 and Codabar):
 
 | Density | `Threshold` 1-module bars | `Snap` 1-module bars |
 | --- | --- | --- |
