@@ -1,0 +1,4 @@
+.vscode/
+.idea/
+*.png
+!testdata/*.png

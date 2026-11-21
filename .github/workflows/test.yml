@@ -1,0 +1,37 @@
+name: Test
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+        go-version:
+          - stable
+          - oldstable
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Set up Go ${{ matrix.go-version }}
+      uses: actions/setup-go@v7
+      with:
+        go-version: ${{ matrix.go-version }}
+
+    - name: Test
+      run: go test -v ./...
+
+    - name: Race
+      run: go test -race -short ./...
