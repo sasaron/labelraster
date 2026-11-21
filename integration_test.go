@@ -34,7 +34,9 @@ func TestMain(m *testing.M) {
 	}
 	code := m.Run()
 	if shared != nil {
-		shared.Close()
+		if err := shared.Close(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		}
 	}
 	os.Exit(code)
 }
@@ -53,7 +55,11 @@ func rasterizeLabel(t *testing.T, file string, d labelraster.Density, s raster.S
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer doc.Close()
+	defer func() {
+		if err := doc.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 	b, err := doc.Rasterize(0, d, s)
 	if err != nil {
 		t.Fatal(err)

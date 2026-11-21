@@ -14,7 +14,7 @@ func TestSend_Listener_ReceivesData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer ln.Close()
+	defer func() { _ = ln.Close() }() // the test has already finished with it
 
 	got := make(chan []byte, 1)
 	go func() {
@@ -23,7 +23,7 @@ func TestSend_Listener_ReceivesData(t *testing.T) {
 			got <- nil
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }() // the client closes first
 		b, _ := io.ReadAll(conn)
 		got <- b
 	}()
@@ -45,7 +45,9 @@ func TestSend_ClosedPort_ReturnsError(t *testing.T) {
 		t.Fatal(err)
 	}
 	addr := ln.Addr().String()
-	ln.Close()
+	if err := ln.Close(); err != nil {
+		t.Fatal(err)
+	}
 	if err := Send(t.Context(), addr, []byte("x")); err == nil {
 		t.Errorf("Send(%q) error = nil, want an error", addr)
 	}

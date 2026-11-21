@@ -22,13 +22,21 @@ func Example() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer r.Close()
+	defer func() {
+		if err := r.Close(); err != nil {
+			log.Print(err)
+		}
+	}()
 
 	doc, err := r.Open(pdf)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer doc.Close()
+	defer func() {
+		if err := doc.Close(); err != nil {
+			log.Print(err)
+		}
+	}()
 
 	b, err := doc.Rasterize(0, labelraster.DPI203, raster.Snap{})
 	if err != nil {

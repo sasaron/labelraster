@@ -28,7 +28,9 @@ func TestMain(m *testing.M) {
 	}
 	code := m.Run()
 	if shared != nil {
-		shared.Close()
+		if err := shared.Close(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+		}
 	}
 	os.Exit(code)
 }
@@ -46,7 +48,11 @@ func openLabel(t *testing.T, file string) *Document {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { doc.Close() })
+	t.Cleanup(func() {
+		if err := doc.Close(); err != nil {
+			t.Error(err)
+		}
+	})
 	return doc
 }
 
