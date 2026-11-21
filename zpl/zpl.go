@@ -26,13 +26,12 @@ func Encode(b labelraster.Bitmap, opt Options) []byte {
 		fmt.Fprintf(&buf, "^PW%d\n^LL%d\n", opt.X+b.Width, opt.Y+b.Height)
 	}
 	if b.Width > 0 && b.Height > 0 {
-		rowsPerBand := maxFieldBytes / b.Stride
+		rowsPerBand := max(maxFieldBytes/b.Stride, 1)
 		for y0 := 0; y0 < b.Height; y0 += rowsPerBand {
 			y1 := min(y0+rowsPerBand, b.Height)
 			band := b.Bits[y0*b.Stride : y1*b.Stride]
 			n := len(band)
-			fmt.Fprintf(&buf, "^FO%d,%d^GFA,%d,%d,%d,", opt.X, opt.Y+y0, n, n, b.Stride)
-			fmt.Fprintf(&buf, "%X^FS\n", band)
+			fmt.Fprintf(&buf, "^FO%d,%d^GFA,%d,%d,%d,%X^FS\n", opt.X, opt.Y+y0, n, n, b.Stride, band)
 		}
 	}
 	if opt.Copies > 1 {

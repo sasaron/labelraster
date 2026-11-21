@@ -17,8 +17,6 @@ import (
 	"github.com/sasaron/labelraster"
 )
 
-var _ labelraster.Source = Page{}
-
 // Renderer renders PDFs with PDFium compiled to WebAssembly.
 // It runs one PDFium instance and is not safe for concurrent use.
 type Renderer struct {
@@ -26,16 +24,18 @@ type Renderer struct {
 	instance gopdfium.Pdfium
 }
 
+const instanceTimeout = 30 * time.Second
+
 // NewRenderer starts a PDFium instance. Call Close when done.
 func NewRenderer() (*Renderer, error) {
 	pool, err := webassembly.Init(webassembly.Config{MinIdle: 1, MaxIdle: 1, MaxTotal: 1})
 	if err != nil {
-		return nil, fmt.Errorf("pdfium: init pdfium: %w", err)
+		return nil, fmt.Errorf("pdfium: init: %w", err)
 	}
-	instance, err := pool.GetInstance(30 * time.Second)
+	instance, err := pool.GetInstance(instanceTimeout)
 	if err != nil {
 		_ = pool.Close()
-		return nil, fmt.Errorf("pdfium: get pdfium instance: %w", err)
+		return nil, fmt.Errorf("pdfium: get instance: %w", err)
 	}
 	return &Renderer{pool: pool, instance: instance}, nil
 }
@@ -89,7 +89,7 @@ func (d *Document) Page(i int) (Page, error) {
 }
 
 // Rasterize renders page i at density with s.
-func (d *Document) Rasterize(i int, density labelraster.Density, s labelraster.Strategy) (labelraster.Bitmap, error) {
+func (d *Document) Rasterize(i int, density labelraster.Density, s labelraster.Rasterizer) (labelraster.Bitmap, error) {
 	p, err := d.Page(i)
 	if err != nil {
 		return labelraster.Bitmap{}, err

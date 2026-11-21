@@ -9,13 +9,14 @@ type RenderOptions struct {
 	NoSmoothImage bool
 }
 
-// Source renders a page scaled to width x height pixels.
+// Source renders a page scaled to fit within width x height pixels.
+// Pixels the image does not cover are treated as white.
 type Source interface {
 	Render(width, height int, opt RenderOptions) (*image.Gray, error)
 }
 
-// Strategy turns a page into a bitmap of width x height dots.
-// Density is for strategies whose options are physical sizes.
-type Strategy interface {
+// Rasterizer turns a page into a bitmap of width x height dots.
+// Density is for implementations whose options are physical sizes.
+type Rasterizer interface {
 	Rasterize(src Source, d Density, width, height int) (Bitmap, error)
 }

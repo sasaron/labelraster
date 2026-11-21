@@ -54,6 +54,16 @@ func TestEncode_Over99999Bytes_SplitsIntoBands(t *testing.T) {
 	}
 }
 
+func TestEncode_RowWiderThanFieldLimit_WritesOneRowPerField(t *testing.T) {
+	b := labelraster.NewBitmap(800008, 2) // 100001 bytes per row
+
+	got := Encode(b, Options{})
+
+	if n := bytes.Count(got, []byte("^GFA,100001,100001,100001,")); n != 2 {
+		t.Errorf("Encode(800008x2) has %d fields of 100001 bytes, want 2", n)
+	}
+}
+
 func TestEncode_RenderedByZebrash_MatchesBitmap(t *testing.T) {
 	for _, size := range []struct{ w, h int }{
 		{406, 203},  // one band

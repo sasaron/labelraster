@@ -29,10 +29,9 @@ const (
 	maxClassRatio = 4.5
 )
 
-// Rasterize implements labelraster.Strategy.
+// Rasterize implements labelraster.Rasterizer.
 func (s Snap) Rasterize(src labelraster.Source, d labelraster.Density, width, height int) (labelraster.Bitmap, error) {
-	b, _, err := newSnapper(s, d).rasterize(src, width, height)
-	return b, err
+	return newSnapper(s, d).rasterize(src, width, height)
 }
 
 // snapper is Snap with defaults applied and sizes converted to dots.
@@ -58,39 +57,33 @@ func newSnapper(s Snap, d labelraster.Density) snapper {
 	return sn
 }
 
-// symbol is a 1D barcode found in the page, in output dots.
-type symbol struct {
-	vertical bool
-	rect     image.Rectangle // original bounds
-	start    float64         // original left edge
-	widths   []float64       // original element widths, bar first
-	dots     []int           // redrawn element widths; nil when left unchanged
+// barcode is a 1D barcode found in the page, in output dots.
+type barcode struct {
+	rect   image.Rectangle // bounds
+	start  float64         // left edge
+	widths []float64       // element widths, bar first
 }
 
-func (s snapper) rasterize(src labelraster.Source, width, height int) (labelraster.Bitmap, []symbol, error) {
+func (s snapper) rasterize(src labelraster.Source, width, height int) (labelraster.Bitmap, error) {
 	img, err := src.Render(width*s.factor, height*s.factor, labelraster.RenderOptions{})
 	if err != nil {
-		return labelraster.Bitmap{}, nil, err
+		return labelraster.Bitmap{}, err
 	}
 	b := downsample(img, width, height, s.factor, defaultLevel)
-
-	var found []symbol
 	for _, bc := range s.find(img, width, height) {
-		found = append(found, s.redraw(b, bc))
+		s.redraw(b, bc)
 	}
-	timg, tb := transposeGray(img), transposeBitmap(b)
-	var vertical bool
-	for _, bc := range s.find(timg, height, width) {
-		bc = s.redraw(tb, bc)
-		bc.vertical = true
-		bc.rect = image.Rect(bc.rect.Min.Y, bc.rect.Min.X, bc.rect.Max.Y, bc.rect.Max.X)
-		found = append(found, bc)
-		vertical = true
+
+	// Vertical barcodes are found and redrawn on the transposed page.
+	vertical := s.find(transposeGray(img), height, width)
+	if len(vertical) == 0 {
+		return b, nil
 	}
-	if vertical {
-		b = transposeBitmap(tb)
+	tb := transposeBitmap(b)
+	for _, bc := range vertical {
+		s.redraw(tb, bc)
 	}
-	return b, found, nil
+	return transposeBitmap(tb), nil
 }
 
 type segment struct {
@@ -112,7 +105,7 @@ func (r *region) near(sg segment, f int) bool {
 }
 
 // find returns horizontal barcodes in img, which is width*f x height*f.
-func (s snapper) find(img *image.Gray, width, height int) []symbol {
+func (s snapper) find(img *image.Gray, width, height int) []barcode {
 	f := s.factor
 	var open, done []*region
 	for y := range height {
@@ -145,14 +138,14 @@ func (s snapper) find(img *image.Gray, width, height int) []symbol {
 	}
 	done = append(done, open...)
 
-	var out []symbol
+	var out []barcode
 	for _, r := range done {
 		if r.y1-r.y0+1 < s.minHeight {
 			continue
 		}
 		n := float64(r.rows)
 		x0, x1 := r.x0/n/float64(f), r.x1/n/float64(f)
-		bc := symbol{
+		bc := barcode{
 			rect:   image.Rect(int(math.Floor(x0)), r.y0, int(math.Ceil(x1)), r.y1+1),
 			start:  x0,
 			widths: make([]float64, len(r.sums)),
@@ -171,7 +164,6 @@ func (s snapper) segments(img *image.Gray, yy, width int) []segment {
 	if yy >= r.Dy() {
 		return nil
 	}
-	maxW := s.maxElement
 	var runs []int // alternating, starting with white
 	black, n := false, 0
 	for x := range min(width, r.Dx()) {
@@ -183,9 +175,6 @@ func (s snapper) segments(img *image.Gray, yy, width int) []segment {
 		n++
 	}
 	runs = append(runs, n)
-	if !black {
-		runs = append(runs, 0)
-	}
 
 	var segs []segment
 	var cur []int
@@ -205,7 +194,7 @@ func (s snapper) segments(img *image.Gray, yy, width int) []segment {
 	}
 	for i, w := range runs {
 		isBlack := i%2 == 1
-		if w > maxW || w == 0 {
+		if w > s.maxElement || w == 0 {
 			flush()
 		} else if isBlack || len(cur) > 0 {
 			if len(cur) == 0 {
@@ -219,19 +208,20 @@ func (s snapper) segments(img *image.Gray, yy, width int) []segment {
 	return segs
 }
 
-// redraw draws bc into b with whole-dot element widths when possible.
-func (s snapper) redraw(b labelraster.Bitmap, bc symbol) symbol {
+// redraw draws bc into b with whole-dot element widths. It leaves b unchanged
+// when bc is doubtful or cannot keep its quiet zone.
+func (s snapper) redraw(b labelraster.Bitmap, bc barcode) {
 	classes := classify(bc.widths)
 	narrow := classes[0]
 	if len(classes) > maxClasses || classes[len(classes)-1]/narrow > maxClassRatio {
-		return bc
+		return
 	}
 	ratio := make([]float64, len(bc.widths))
 	total := 0.0
 	for i, w := range bc.widths {
 		c := nearest(classes, w)
 		if math.Abs(w-c) > 0.35*narrow {
-			return bc
+			return
 		}
 		ratio[i] = c / narrow
 		total += w
@@ -242,7 +232,7 @@ func (s snapper) redraw(b labelraster.Bitmap, bc symbol) symbol {
 	leftGap := gap(b, mid, bc.rect.Min.X-1, -1)
 	rightGap := gap(b, mid, bc.rect.Max.X, 1)
 	if float64(min(leftGap, rightGap)) < 3*narrow {
-		return bc
+		return
 	}
 
 	for m := int(math.Round(narrow)); m >= s.minModule; m-- {
@@ -259,12 +249,10 @@ func (s snapper) redraw(b labelraster.Bitmap, bc symbol) symbol {
 		if left < min(leftGap, quiet) || right < min(rightGap, quiet) {
 			continue
 		}
-		clear := image.Rect(min(bc.rect.Min.X, x0), bc.rect.Min.Y, max(bc.rect.Max.X, x0+width), bc.rect.Max.Y)
-		drawBars(b, clear, x0, dots)
-		bc.dots = dots
-		return bc
+		area := image.Rect(min(bc.rect.Min.X, x0), bc.rect.Min.Y, max(bc.rect.Max.X, x0+width), bc.rect.Max.Y)
+		drawBars(b, area, x0, dots)
+		return
 	}
-	return bc
 }
 
 // drawBars clears rect in b and draws elements of the given widths from x0, bar first.

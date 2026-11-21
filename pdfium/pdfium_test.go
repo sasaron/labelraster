@@ -33,7 +33,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// blank is a Strategy that returns a white bitmap of the requested size.
+// blank is a Rasterizer that returns a white bitmap of the requested size.
 type blank struct{}
 
 func (blank) Rasterize(_ labelraster.Source, _ labelraster.Density, w, h int) (labelraster.Bitmap, error) {

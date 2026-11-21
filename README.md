@@ -43,16 +43,16 @@ err = rawprint.Send(ctx, "192.0.2.10", zpl.Encode(b, zpl.Options{}))
 
 | Package | Description |
 | --- | --- |
-| `labelraster` | `Bitmap`, `Density`, and the `Source` and `Strategy` interfaces |
+| `labelraster` | `Bitmap`, `Density`, and the `Source` and `Rasterizer` interfaces |
 | `pdfium` | Renders PDF pages with PDFium (WebAssembly). Adds about 12 MB to a binary |
-| `raster` | Strategies that turn a `Source` into a `Bitmap`: `Threshold`, `Supersample`, `Snap` |
+| `raster` | Rasterizers that turn a `Source` into a `Bitmap`: `Threshold`, `Supersample`, `Snap` |
 | `zpl` | Encodes a bitmap as ZPL |
 | `sbpl` | Encodes a bitmap as SBPL |
 | `rawprint` | Sends data to TCP port 9100 |
 
-## Strategies
+## Rasterizers
 
-| Strategy | How | Barcode widths |
+| Rasterizer | How | Barcode widths |
 | --- | --- | --- |
 | `Threshold` | Render at the dot grid and threshold | Uneven |
 | `Supersample` | Render at N times the grid and average | Uneven |
@@ -78,4 +78,6 @@ Measured on the test label in `testdata` (0.3 mm module, Code 128 and Codabar):
 
 ## License
 
-MIT
+MIT.
+
+The `pdfium` package embeds a WebAssembly build of [PDFium](https://pdfium.googlesource.com/pdfium/) through go-pdfium. PDFium has its own license (BSD-style and Apache-2.0); include its notices when you distribute a binary that imports `pdfium`. This project is not affiliated with Google or the PDFium authors.

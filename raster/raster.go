@@ -8,9 +8,9 @@ import (
 )
 
 var (
-	_ labelraster.Strategy = Threshold{}
-	_ labelraster.Strategy = Supersample{}
-	_ labelraster.Strategy = Snap{}
+	_ labelraster.Rasterizer = Threshold{}
+	_ labelraster.Rasterizer = Supersample{}
+	_ labelraster.Rasterizer = Snap{}
 )
 
 // Threshold renders at the dot grid and marks pixels darker than Level as black.
@@ -19,7 +19,7 @@ type Threshold struct {
 	Options labelraster.RenderOptions
 }
 
-// Rasterize implements labelraster.Strategy.
+// Rasterize implements labelraster.Rasterizer.
 func (t Threshold) Rasterize(src labelraster.Source, _ labelraster.Density, width, height int) (labelraster.Bitmap, error) {
 	img, err := src.Render(width, height, t.Options)
 	if err != nil {
@@ -46,7 +46,7 @@ type Supersample struct {
 	Options labelraster.RenderOptions
 }
 
-// Rasterize implements labelraster.Strategy.
+// Rasterize implements labelraster.Rasterizer.
 func (s Supersample) Rasterize(src labelraster.Source, _ labelraster.Density, width, height int) (labelraster.Bitmap, error) {
 	f := s.Factor
 	if f < 1 {

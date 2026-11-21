@@ -44,7 +44,7 @@ func TestMain(m *testing.M) {
 }
 
 // rasterizeLabel renders page 0 of testdata/file.
-func rasterizeLabel(t *testing.T, file string, d labelraster.Density, s labelraster.Strategy) labelraster.Bitmap {
+func rasterizeLabel(t *testing.T, file string, d labelraster.Density, s labelraster.Rasterizer) labelraster.Bitmap {
 	t.Helper()
 	if shared == nil {
 		t.Skip("skipping PDFium test in short mode")

@@ -13,6 +13,8 @@ const (
 	esc = 0x1b
 	stx = 0x02
 	etx = 0x03
+
+	maxSize = 999 // ESC+G sizes are three digits
 )
 
 // Model holds the ESC+G size limits of a printer.
@@ -45,7 +47,7 @@ func Encode(b labelraster.Bitmap, m Model, opt Options) ([]byte, error) {
 	if b.Stride == 0 || units == 0 {
 		return nil, errors.New("sbpl: empty bitmap")
 	}
-	if b.Stride > min(m.MaxCrossBytes, 999) || units > min(m.MaxLengthUnits, 999) {
+	if b.Stride > min(m.MaxCrossBytes, maxSize) || units > min(m.MaxLengthUnits, maxSize) {
 		return nil, fmt.Errorf("%w: %d bytes x %d units", ErrTooLarge, b.Stride, units)
 	}
 
